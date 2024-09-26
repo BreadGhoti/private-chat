@@ -4,7 +4,83 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Local Chat</title>
-    <link rel="stylesheet" href="styles.css">
+    <style>
+      body {
+    font-family: Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background-color: #f0f0f0;
+    margin: 0;
+}
+
+#menu-container, #chat-container {
+    background: #fff;
+    padding: 20px;
+    border-radius: 5px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    width: 300px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+#menu-container button, #chat-container button {
+    padding: 10px;
+    background-color: #007BFF;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    width: 100%;
+}
+
+#messages {
+    flex: 1;
+    overflow-y: auto;
+    margin-bottom: 10px;
+    width: 100%;
+}
+
+#message-input {
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    margin-bottom: 10px;
+    width: 100%;
+}
+
+#send-button {
+    padding: 10px;
+    background-color: #007BFF;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    width: 100%;
+}
+
+#send-button:hover {
+    background-color: #0056b3;
+}
+
+#console {
+    position: fixed;
+    bottom: 10px;
+    left: 10px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 10px;
+    border-radius: 5px;
+    max-height: 150px;
+    overflow-y: auto;
+    width: calc(100% - 20px);
+    box-sizing: border-box;
+    font-size: 12px;
+    z-index: 1000;
+}
+    </style>
 </head>
 <body>
     <div id="menu-container">
@@ -20,6 +96,132 @@
     </div>
     <div id="console"></div>
     <script src="https://cdn.jsdelivr.net/npm/peerjs@1.3.1/dist/peerjs.min.js"></script>
-    <script src="script.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+    const peer = new Peer();
+    let conn;
+
+    function logToConsole(message) {
+        const consoleDiv = document.getElementById('console');
+        const messageElement = document.createElement('div');
+        messageElement.textContent = message;
+        consoleDiv.appendChild(messageElement);
+        consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        console.log(message); // Also log to browser console for easier debugging on mobile
+    }
+
+    function enableChat() {
+        sendButton.disabled = false;
+        messageInput.disabled = false;
+        logToConsole('Chat enabled: send button and message input are now active.');
+    }
+
+    function disableChat() {
+        sendButton.disabled = true;
+        messageInput.disabled = true;
+        logToConsole('Chat disabled: send button and message input are now inactive.');
+    }
+
+    function setupConnection(connection) {
+        logToConsole('Setting up connection');
+        conn = connection;
+        conn.on('data', (data) => {
+            logToConsole('Received data: ' + data);
+            displayMessage('Friend', data);
+        });
+
+        conn.on('open', () => {
+            logToConsole('Connection opened');
+            enableChat();
+        });
+
+        conn.on('close', () => {
+            logToConsole('Connection closed');
+            disableChat();
+        });
+
+        conn.on('error', (err) => {
+            logToConsole('Connection error: ' + err);
+            disableChat();
+        });
+
+        if (conn.open) {
+            enableChat();
+        }
+    }
+
+    function displayMessage(sender, message) {
+        const messageElement = document.createElement('div');
+        messageElement.textContent = `${sender}: ${message}`;
+        messagesDiv.appendChild(messageElement);
+    }
+
+    function checkWebRTCSupport() {
+        const supported = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+        logToConsole('WebRTC supported: ' + supported);
+        return supported;
+    }
+
+    peer.on('open', (id) => {
+        logToConsole('My peer ID is: ' + id);
+    });
+
+    peer.on('connection', (connection) => {
+        logToConsole('Received connection');
+        setupConnection(connection);
+    });
+
+    const menuContainer = document.getElementById('menu-container');
+    const chatContainer = document.getElementById('chat-container');
+    const hostButton = document.getElementById('host-button');
+    const joinButton = document.getElementById('join-button');
+    const joinIdInput = document.getElementById('join-id-input');
+    const joinIdButton = document.getElementById('join-id-button');
+    const sendButton = document.getElementById('send-button');
+    const messageInput = document.getElementById('message-input');
+    const messagesDiv = document.getElementById('messages');
+
+    hostButton.addEventListener('click', () => {
+        if (checkWebRTCSupport()) {
+            menuContainer.style.display = 'none';
+            chatContainer.style.display = 'flex';
+            alert('Your room ID is: ' + peer.id);
+        } else {
+            alert('WebRTC is not supported in this browser.');
+        }
+    });
+
+    joinButton.addEventListener('click', () => {
+        joinIdInput.style.display = 'block';
+        joinIdButton.style.display = 'block';
+    });
+
+    joinIdButton.addEventListener('click', () => {
+        const friendId = joinIdInput.value;
+        logToConsole('Friend ID: ' + friendId);
+        if (friendId) {
+            const connection = peer.connect(friendId);
+            connection.on('open', () => {
+                logToConsole('Connection to host opened');
+                setupConnection(connection);
+            });
+            connection.on('error', (err) => {
+                logToConsole('Connection error: ' + err);
+            });
+        }
+        menuContainer.style.display = 'none';
+        chatContainer.style.display = 'flex';
+    });
+
+    sendButton.addEventListener('click', () => {
+        const message = messageInput.value;
+        if (message) {
+            displayMessage('You', message);
+            conn.send(message);
+            messageInput.value = '';
+        }
+    });
+});
+</script>
 </body>
 </html>
